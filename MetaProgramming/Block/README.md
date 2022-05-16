@@ -76,3 +76,41 @@ class Array
   end
 end
 ```
+
+***
+### instance_exec, instance_eval
+
+위에서 살펴본 `yield` 와 `&block` 키워드와는 다른 동작을 역할을 하는 `instance_exec` 와 `instance_eval` 키워드를 알아보자.
+
+블록은 위에서 알려준 2가지 메소드에 의해서도 호출이 될 수 있다.
+
+```ruby
+class Cat
+  def do_something(&block)
+    instance_exec(&block)
+  end
+  
+  def sit
+    "I am sitting"
+  end
+end
+```
+사용법은 위와 같다. `Cat` 의 `sit` 메소드를 호출하려면 
+
+```ruby
+cat = Cat.new
+cat.do_something { puts cat.sit }
+```
+
+이렇게 호출하면 됐다. 하지만 `instance_exec` 메소드로 블록을 호출하면 `Cat` 클래스에 참조를 끊어도 `sit` 메소드에 접근이 가능하다.
+
+```ruby
+cat = Cat.new
+cat.do_something { puts sit }
+```
+
+이 부분이 `yield` 와 다른 점이다.
+
+이러한 프로그래밍 기능이 왜 필요한 걸까?
+***
+### why need 'instance_eval' and 'instnace_exec' 
