@@ -113,4 +113,76 @@ cat.do_something { puts sit }
 
 이러한 프로그래밍 기능이 왜 필요한 걸까?
 ***
-### why need 'instance_eval' and 'instnace_exec' 
+### why need 'instance_eval'
+루비 언어는 `scope gate`를 가지고 있는데 다음의 예시를 통해 이해해보자.
+
+```ruby
+v1 = 1
+class MyClass
+  v2 = 2
+  local_variables #1)
+  def my_method
+    v3 = 3
+    local_variables #2)
+  end
+  local_variables #3)
+end
+
+obj = MyClass.new
+obj.my_method
+local_variables #4)
+```
+위 코드에서 넘버링 된 부분의 지역 변수는 어떤 것일지 예상해보자
+```
+#1) === v2
+#2) === v3
+#3) === v2
+#4) === v1, obj
+```
+
+`local_variables`는 scope인 변수를 가리키는 것인데 내가 예상한 것과 전혀 다른 변수들을 가리키고 있었다. 내부적으로 어떻게 동작하는지 알아보자
+
+제일 처음부분에서 `v1`을 정의하며 scope는 `v1`이 있다. 하지만 `MyClass`를 정의하는 부분으로 들어가면서 scope는 `MyClass`로 넘어가게 된다. `MyClass`의 정의가 끝나게 되면 `scope`는 `top-level`으로 돌아온다. 마지막 `my_method`를 호출하게 되면 기존에 `top-level`에 머물던 scope는 버리고 MyClass 안의 `my_method` scope를 다시 생성한다. 그리고 실행이 종료되면 `my_method` scope를 버리고 `top-level` scope로 돌아오게 된다.
+
+이처럼 Ruby는 scope가 변경될 때 기존에 바인딩 되어있던 정보를 버리고 새로운 정보를 바인딩 하게 된다. Ruby에서는 기존의 바인딩을 버리는 키워드가 있는데 이를 바로  `scope gates`라고 한다.
+
+루비에는 3가지의 scope gates 가 있다.
+```
+1. class를 정의할 때
+2. module을 정의할 때
+3. 함수
+```
+위 3가지 시점에 기존의 바인딩을 버리게 된다.
+
+```ruby
+v1 = 1
+class Test
+  v2 = v1
+  def test_method
+    v3 = v1
+  end
+end
+```
+그런데 scope gates가 있더라도 위와 같이 사용하고 싶을 때가 있다.
+여러가지 방법이 있는데 여기서는 `instance_eval`만 다루어 보겠다.
+
+아래 예제를 확인해보자
+```ruby
+class MyClass
+  def init
+    @v1 = 1
+  end
+end
+
+obj = MyClass.new
+obj.instance_eval do 
+  self
+  @v
+end
+
+v = 2
+obj.instance_eval { @v1 = 2 }
+obj.instance_eval { @v1 }
+```
+위 예시를 보면 새로운 정보가 바인딩 되어야 하지만 `MyClass` 내부 변수에 접근도 하고 새로운 값을 할당할 수 있는 모습을 볼 수 있다.
+`instacne_eval`은 위처럼 `scope gate`를 무시하고 변수에 접근 및 값을 할당 할 수 있다.
