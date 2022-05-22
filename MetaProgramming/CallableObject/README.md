@@ -191,4 +191,51 @@ lambda로 인자 갯수를 맞춰주지 않으면 에러가 발생하고 아래 
 
 proc 보다 lambda가 함수와 형태가 가까워 proc보다 lambda를 사용하는 것이 이슈를 트래킹하기 더 편하다. 그래서 일반적인 경우에는 lambda를 사용하는 것이 더 좋지만 특수한 경우에는 proc을 사용해야 한다.
 
+### method
+callable object의 마지막은 `method`이다. 루비에서는 클래스이 메소드도 뽑아낼 수 있다. 다음 예제를 보자.
+```ruby
+class Test
+  def initialize(value)
+    @value1 = value
+  end
 
+  def my_method
+    @value1
+  end
+end
+
+some_test = Test.new(1)
+some_test_method = some_test.method :my_method
+puts(some_test_method.class) # => Method
+puts(some_test_method.call) # => 1
+method_proc = some_test_method.to_proc
+puts(method_proc.class)
+puts(method_proc.lambda?)
+```
+
+위 예제에서는 뽑아낸 메소드를 `to_proc`을 활용하여 proc으로 만들었다. to_proc을 이용해서 만든 proc은 lambda 지만 lambda 키워드로 생성한 lambda와 scope에서 차이를 보인다.
+
+lambda 키워드로 생성한 매소드는 정의된 시점의 scope 를 통해서 binding 하는 `closure`지만 `to_proc`으로 생성한 메소드는 scope가 메소드를 소유한 객체에 있다.
+
+해당 scope를 끊어 내려면 `UnboundMethod`를 획득해야 한다. 일반적으로 클래스나 모듈 내부에서 정의된 method는 `BoundMethod`인데 이는 위의 설명과 같이 특정 객체에 scope가 존재한다. 하지만 `UnboundMethod`는 특정 객체에 scope가 바인딩 되어 있지 않는 메소드다.
+
+`UnboundMethod`를 획득하려면 `instance_method`를 활용하면 되는데 사용하는 방법은 다음과 같다.
+
+```ruby
+module MyModule
+  def my_method
+    1
+  end
+end
+
+some_unbound_method = MyModule.instance_method :my_method
+puts(some_unbound_method.class) # => UnboundMethod
+String.class_eval do
+  define_method :custom_method, some_unbound_method
+end
+
+puts("some string".custom_method) # => 1
+```
+
+위와 같이 뽑아낸 `UnboundMethod`는 `UnboundMethod#bind` 또는
+`Module#define_method`를 통해서 바인딩을 할 수 있다.
