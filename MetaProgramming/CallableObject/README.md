@@ -73,4 +73,122 @@ outer 함수는 x라는 지역변수에 10을 할당하여 사용한다. innerLa
 
 
 ### & 연산자
-`&`
+`&` 연산자는 다음의 2가지 상황에서 사용한다.
+- 1. 정의된 block을 다른 함수에서 사용하고 싶을 때
+- 2. 정의된 block을 Proc으로 변환시키고 싶을 때
+
+```ruby
+def my_method(&the_proc)
+  the_proc
+end
+
+p = my_method {|name| "Hello, #{name}"}
+p.call('tom') # => Hello, tom
+```
+
+아래 예시는 `&`연산자를 사용하지 않은 경우다.
+```ruby
+def my_method(the_proc)
+  the_proc
+end
+
+p = my_method {|name| puts( "Hello, #{name}")}
+p.call('tom') # => Hello, tom
+```
+위 로직을 실행하면 다음과 같은 에러를 만날 수 있다.
+```
+main.rb:1:in `my_method': wrong number of arguments     
+(given 0, expected 1) (ArgumentError)
+```
+
+my_method의 인자 갯수는 1개지만 해당 로직에서 my_method를 인자 없이 호출했다는 의미다. 즉 block을 `&`연산자 없이 함수의 인자로 할당이 불가능하다는 의미다. `&`연산자 없이 사용하려면 아래와 같이 block을 Proc으로 만들어주면 된다.
+
+```ruby
+def my_method(the_proc)
+  the_proc
+end
+
+current_proc = -> (name){ puts("Hello, #{name}") }
+p = my_method(current_proc)
+p.call('tom') # => Hello, tom
+```
+`->`키워드를 통해서 lambda로 Proc을 생성해주고 난 후 my_method에 인자로 넘겨주면 `&`연산자 없이도 정상적인 실행이 가능하다.
+
+그렇가면 Proc을 block으로 변환하는 방법을 알아보자 위와 동일하게 `&`연산자를 사용하면 되지만 사용하게 되는 위치가 조금 다르다.
+
+```ruby
+def my_method(greeting)
+ puts("#{greeting}, #{yield}")
+end
+
+my_proc =proc{"tom"}
+my_method("Hello ", &my_proc)
+```
+
+my_proc을 Proc으로 만들어 둔 후에 my_method를 호출하는 부분에서 `&`를 사용하여 block으로 만들어 준 후에 `yield` 키워드로 넘겨주는 방식이다.
+
+### proc VS lambda
+지금까지 Proc을 만드는 방법으로 `Proc.new`,`lambda`,`& 연산자`에 대해서 알아보았다. 그렇다면 Proc.new 로 생성한 proc과 lambda로 생성한 proc에는 차이가 있을까? 있다면 어떤 차이가 있는지 알아보자
+
+- return
+proc 과 lambda는 내부에서 사용한 return에 차이가 있다.
+
+```ruby
+def test(callable_obj)
+  callable_obj.call * 2
+end
+
+some_lambda -> { return 10 }
+puts(test(some_lambda)) # => 20
+```
+lambda에서의 return은 우리가 흔히 알고 있는 return과 동일하다. lambda 내부에서 return 시 proc 객체를 빠져나온다.
+
+```ruby
+def test
+  some_proc = Proc.new { return 10 }
+  result = 0
+  puts("before call Proc result => #{result}")
+  result = some_proc.call
+  puts("after call Proc result => #{result}")
+end
+
+test
+```
+
+하지만 proc에서의 return을 하면 proc 객체를 빠져나오는 것 뿐 아니라 proc 객체의 scope 까지 나와버리기 때문에
+`after call Proc result => #{result}` 문은 실행되지 않으며
+`result = some_proc.call`에서 함수가 종료되어 버린다.
+
+```ruby
+def test(callable_obj)
+  puts("call test")
+  callable_obj.call * 2
+end
+
+some_proc = proc { return 10 }
+puts(test(some_proc))
+```
+위 함수에서도 `callable_obj.call` 문이 실행이 되고 그 후에 있는 2를 곱하는 연산은 실행되지 않고 `test` 함수가 종료되어 버린다.
+
+- parameter
+
+proc 내부로 전달된 파라미터가 정확하게 일치하지 않아도 무시하지만 lambda 내부로 전달된 파라미터가 정확하게 일치하지 않으면 에러가 발생한다. 
+```ruby
+some_proc = Proc.new {|a,b| puts("a => #{a}, b => #{b}")}
+some_proc.call(1) # a => 1, b => 
+some_proc.call(1,2) # a => 1, b => 2
+some_proc.call(1,2,3) # a => 1, b => 2
+```
+
+```ruby
+some_lambda = -> (a,b){puts("a => #{a}, b => #{b}")}
+some_lambda.call(1) # main.rb:1:in `block in <main>': wrong number of arguments (given 1, expected 2) (ArgumentError)
+some_lambda.call(1,2)
+some_lambda.call(1,2,3)
+```
+
+lambda로 인자 갯수를 맞춰주지 않으면 에러가 발생하고 아래 코드가 실행되지 않는다.
+
+proc 보다 lambda가 함수와 형태가 가까워 proc보다 lambda를 사용하는 것이 이슈를 트래킹하기 더 편하다. 그래서 일반적인 경우에는 lambda를 사용하는 것이 더 좋지만 특수한 경우에는 proc을 사용해야 한다.
+
+
